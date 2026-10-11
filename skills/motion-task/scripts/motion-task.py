@@ -147,7 +147,7 @@ def jag():
 def gamla(arkivera=False):
     """Äldre kopior av motion-task (skill-mappar, lösa skript från zip-tiden). Flyttas till ~/.claude/skills-arkiv, aldrig radera."""
     hem = os.path.expanduser("~")
-    har = os.path.realpath(os.path.join(os.path.dirname(os.path.abspath(__file__)), ".."))
+    har = os.path.dirname(os.path.dirname(os.path.realpath(__file__)))  # realpath: också när skriptet körs via en genväg
     kandidater = [f"{hem}/.claude/skills/motion-task", f"{hem}/.agents/skills/motion-task",
                   f"{hem}/.claude/scripts/motion-task.py", f"{hem}/.claude/scripts/motion-kommentar.py"]
     # en symlänk till den här skillen (till exempel ~/.claude/scripts/motion-task.py) är en genväg, inte en kopia
