@@ -99,13 +99,15 @@ def nyckel():
             return json.load(f)["mcpServers"]["motion"]["env"]["MOTION_API_KEY"]
     except (OSError, KeyError, ValueError):
         pass
-    try:  # Alternativ uppsättning: nyckeln står i startskriptet
-        with open(os.path.expanduser("~/.config/motion-mcp/run.sh")) as f:
-            m = re.search(r"MOTION_API_KEY=[\"']?([^\"'\s]+)", f.read())
-        if m:
-            return m.group(1)
-    except OSError:
-        pass
+    # Alternativ uppsättning: nyckeln står i env-filen eller i startskriptet
+    for fil in ("~/.config/motion-mcp/env", "~/.config/motion-mcp/run.sh"):
+        try:
+            with open(os.path.expanduser(fil)) as f:
+                m = re.search(r"MOTION_API_KEY=[\"']?([^\"'\s$]+)", f.read())
+            if m:
+                return m.group(1)
+        except OSError:
+            pass
     sys.exit("Hittar ingen Motion-nyckel. Sätt MOTION_API_KEY eller lägg Motion-kopplingen i Claude-appen.")
 
 

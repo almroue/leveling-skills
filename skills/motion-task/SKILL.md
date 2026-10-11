@@ -200,7 +200,7 @@ Skriptet `python3 ~/.claude/skills/motion-task/scripts/motion-task.py` gör det 
 Skripten behöver din nyckel. Den är personlig och hemlig: den ger tillgång till hela din Motion.
 
 1. **Skapa den själv:** logga in i Motion, öppna Settings och skapa en API-nyckel. Motion visar den bara en gång.
-2. **Lägg den själv där skripten hittar den:** antingen i Motion-kopplingens inställning i Claude-appen (`mcpServers.motion.env.MOTION_API_KEY`), eller som `export MOTION_API_KEY=…` i din egen terminal-profil. Skriv den bara på din egen dator. Klistra aldrig in den i chatten, i en task, i en kommentar eller i en fil som delas.
+2. **Lägg den själv där skripten hittar den:** antingen i Motion-kopplingens inställning i Claude-appen (`mcpServers.motion.env.MOTION_API_KEY`), som `export MOTION_API_KEY=…` i din egen terminal-profil, eller som `MOTION_API_KEY=…` i `~/.config/motion-mcp/env` (den filen läses också). Skriv den bara på din egen dator. Klistra aldrig in den i chatten, i en task, i en kommentar eller i en fil som delas.
 3. **Rensa gamla kopior:** `python3 ~/.claude/skills/motion-task/scripts/motion-task.py gamla` listar dem, `gamla --arkivera` flyttar dem.
 4. **Prova:** `python3 ~/.claude/skills/motion-task/scripts/motion-task.py vem` ska svara `Nyckeln funkar. Inloggad som <ditt namn>.`
 

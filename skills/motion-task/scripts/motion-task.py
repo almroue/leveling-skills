@@ -51,12 +51,16 @@ INSTALLNINGAR = [
 
 def nyckel_ur_startskript():
     # Alternativ uppsättning: nyckeln står i startskriptet, inte i mcpServers.
-    try:
-        with open(os.path.expanduser("~/.config/motion-mcp/run.sh")) as f:
-            m = re.search(r"MOTION_API_KEY=[\"']?([^\"'\s]+)", f.read())
-        return m.group(1) if m else None
-    except OSError:
-        return None
+    # run.sh läser ofta in nyckeln från env-filen bredvid, så kolla båda.
+    for fil in ("~/.config/motion-mcp/env", "~/.config/motion-mcp/run.sh"):
+        try:
+            with open(os.path.expanduser(fil)) as f:
+                m = re.search(r"MOTION_API_KEY=[\"']?([^\"'\s$]+)", f.read())
+            if m:
+                return m.group(1)
+        except OSError:
+            pass
+    return None
 
 
 def nyckel():
