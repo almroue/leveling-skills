@@ -150,7 +150,8 @@ def gamla(arkivera=False):
     har = os.path.realpath(os.path.join(os.path.dirname(os.path.abspath(__file__)), ".."))
     kandidater = [f"{hem}/.claude/skills/motion-task", f"{hem}/.agents/skills/motion-task",
                   f"{hem}/.claude/scripts/motion-task.py", f"{hem}/.claude/scripts/motion-kommentar.py"]
-    gamla_ = [k for k in kandidater if os.path.lexists(k) and os.path.realpath(k) != har]
+    # en symlänk till den här skillen (till exempel ~/.claude/scripts/motion-task.py) är en genväg, inte en kopia
+    gamla_ = [k for k in kandidater if os.path.lexists(k) and not (os.path.realpath(k) + os.sep).startswith(har + os.sep)]
     print(f"Den här (behålls): {har}")
     if not gamla_:
         print("Inga gamla kopior hittades.")
