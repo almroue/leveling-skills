@@ -10,7 +10,7 @@ Den skrivs aldrig ut. Namn att tagga hämtas ur Motion (förnamn, gemener), inga
 En kommentar går inte att ändra eller radera via API:t: tagga i första kommentaren.
 
 Mall: 3 stycken med tom rad emellan, taggen sist.
-  Rubrik: Beslut:, Kolla: eller Blockerad: + ämne, max 60 tecken
+  Rubrik: Beslut:, Kolla:, Blockerad: eller Stängd: + ämne, max 60 tecken
   Läget: 1 mening
   Din uppgift: 1 mening
 Ton: som till en barndomsvän. Vänligt, rakt på sak, vardagsord.
@@ -66,7 +66,7 @@ def tagg(person):
     )
 
 
-ETIKETTER = ("Beslut:", "Kolla:", "Blockerad:")
+ETIKETTER = ("Beslut:", "Kolla:", "Blockerad:", "Stängd:")
 RUBRIK_MAX = 60  # inkorgen klipper efter ~35 tecken: rubriken måste säga allt som är viktigt
 
 

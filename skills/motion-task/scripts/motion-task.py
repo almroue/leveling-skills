@@ -16,6 +16,9 @@ Task = länk (...?task=tk_abc) eller id (tk_abc).
   motion-task.py moten [--sok text] [--antal 5] [--full]   # notetakerns sammanfattning + åtgärdspunkter (bara läsning)
   motion-task.py gilla  <task> [--kommentar com_x] [--egna]
   motion-task.py status <task> <namn> [--bekrafta]   # Completed/Canceled kräver --bekrafta
+  motion-task.py stang  <task> --text "Stängd: ..." [--tagga namn] [--trots-steg]   # Completed + Stängd-kommentar (alla steg bockade)
+  motion-task.py laget  <task> "<vad som hänt>"   # skriver eller byter raden Läget: överst i texten, rör inget annat
+  motion-task.py stad   [--dagar 30] [--alla]     # öppna tasks: klara men öppna, orörda i N dagar (--alla: alla titlar, för dubbletter)
   motion-task.py hamta  <task> <mapp> [--namn fil.zip]   # senaste bilagan med det namnet
   motion-task.py bifoga <task> <fil> [<fil> ...] [--flytta]   # --flytta: .md raderas lokalt när Motion bevisligen har en byte-lik kopia
   motion-task.py steg   <task> <projekt-id> [steg]  # lägger tasken i projektets steg (utan steg: listar stegen)
@@ -30,11 +33,13 @@ import mimetypes
 import os
 import re
 import shutil
+import subprocess
 import sys
 import time
 import urllib.error
 import urllib.request
 import uuid
+from datetime import datetime, timezone
 
 V1 = "https://api.usemotion.com/v1"
 V2 = "https://internal.usemotion.com/v2"
@@ -241,6 +246,8 @@ def status(tid, onskat, bekrafta=False):
     if not val:
         sys.exit(f"Okänd status '{onskat}'. Giltiga: {', '.join(giltiga)}")
     if val.lower() in KRAVER_BEKRAFTELSE and not bekrafta:
+        if val.lower() == "completed":
+            sys.exit("Completed: använd stang (Stängd-kommentar + Completed), eller --bekrafta om personen sagt ja.")
         sys.exit(f"{val} stänger tasken och är personens beslut. Lägg till --bekrafta om personen sagt ja.")
     gammal = v1["status"]["name"]
     if gammal != val:
@@ -252,10 +259,80 @@ def status(tid, onskat, bekrafta=False):
         sys.exit("Statusen blev inte som önskat." + (" Tasken är ett kalenderblock (fixed time): API:t kan inte ändra dess status. Be personen trycka Mark complete i Motion." if fast else ""))
 
 
+DIR = os.path.dirname(os.path.abspath(__file__))
+LAGET = re.compile(r"<p><strong>Läget:</strong>.*?</p>", re.S)
+
+
+def kommentar(tid, tagga, text, prov=False):
+    kor = [sys.executable, os.path.join(DIR, "motion-kommentar.py"), "--task", tid, "--tagga", tagga or "", "--text", text]
+    r = subprocess.run(kor + (["--prov"] if prov else []), capture_output=True, text=True)
+    if r.returncode:
+        sys.exit(r.stderr.strip() or r.stdout.strip())
+    return r.stdout.strip()
+
+
+def stang(tid, tagga, text, trots_steg=False):
+    text = text.replace("\\n", "\n")
+    if not text.strip().startswith("Stängd:"):
+        sys.exit("Texten ska börja med 'Stängd: <ämne>', sedan lösningen eller varför, sedan 'Inget att göra...'.")
+    if len([s for s in text.split("\n\n") if s.strip()]) != 3:
+        sys.exit("Stängd-kommentaren ska ha 3 stycken med tom rad emellan (rubrik, lösningen, Inget att göra...).")
+    kvar = [text_av(t) for k, t in RUTA.findall(json_anrop("GET", f"{V1}/tasks/{tid}").get("description") or "") if k == "false"]
+    if kvar and not trots_steg:
+        sys.exit("Steg som inte är bockade: " + " | ".join(kvar) + "\nGjorda: bocka dem först. Inte gjorda: tasken är inte klar (Canceled kräver personens ja).")
+    kommentar(tid, tagga, text, prov=True)  # fäller fel tagg eller rubrik innan något ändras
+    status(tid, "Completed", bekrafta=True)  # kalenderblock stoppas här, då skickas ingen kommentar
+    print("Kommentar", kommentar(tid, tagga, text))
+
+
+def laget(tid, rad):
+    beskr = json_anrop("GET", f"{V1}/tasks/{tid}").get("description") or ""
+    ny_rad = f"<p><strong>Läget:</strong> {html.escape(rad.strip())}</p>"
+    ny = LAGET.sub(lambda _: ny_rad, beskr, count=1) if LAGET.search(beskr) else ny_rad + beskr
+    json_anrop("PATCH", f"{V1}/tasks/{tid}", {"description": ny})
+    if ny_rad not in (json_anrop("GET", f"{V1}/tasks/{tid}").get("description") or ""):
+        sys.exit("Motion tog inte emot Läget-raden. Kolla i appen.")
+    print(f"Läget skrivet överst i {tid}")
+
+
+def tid_av(s):
+    return datetime.fromisoformat(s.replace("Z", "+00:00"))
+
+
+def stad(dagar=30, alla=False):
+    ws = next(w["id"] for w in json_anrop("GET", f"{V1}/workspaces")["workspaces"] if w["name"] == "Leveling Systems")
+    oppna, cursor = [], None
+    while True:
+        d = json_anrop("GET", f"{V1}/tasks?workspaceId={ws}" + (f"&cursor={cursor}" if cursor else ""))
+        oppna += [t for t in d["tasks"] if not t.get("completed") and not t["status"].get("isResolvedStatus") and t["status"]["name"] not in ("Completed", "Canceled")]
+        cursor = (d.get("meta") or {}).get("nextCursor")
+        if not cursor:
+            break
+    nu = datetime.now(timezone.utc)
+
+    def rad(t):
+        orord = (nu - tid_av(t.get("lastInteractedTime") or t["updatedTime"])).days
+        vem = ", ".join(a["name"] for a in t.get("assignees") or []) or "ingen"
+        return f"  {orord:>3} d | {t['status']['name']} | {vem} | {t['name']} | https://app.usemotion.com/web/pm/workspaces/{ws}?task={t['id']}"
+
+    klara = [t for t in oppna if (r := RUTA.findall(t.get("description") or "")) and all(k == "true" for k, _ in r)]
+    gamla_t = [t for t in oppna if t not in klara and (nu - tid_av(t.get("lastInteractedTime") or t["updatedTime"])).days >= dagar]
+    print(f"ÖPPNA: {len(oppna)}")
+    print(f"\nKLARA MEN ÖPPNA (alla steg bockade, stäng med stang): {len(klara)}")
+    print("\n".join(map(rad, klara)))
+    print(f"\nORÖRDA I {dagar}+ DAGAR (fråga personen: Canceled eller leva vidare?): {len(gamla_t)}")
+    print("\n".join(map(rad, sorted(gamla_t, key=lambda t: t.get("lastInteractedTime") or t["updatedTime"]))))
+    if alla:
+        print("\nALLA ÖPPNA, efter titel (leta dubbletter):")
+        print("\n".join(map(rad, sorted(oppna, key=lambda t: t["name"].split(":", 1)[-1].strip().lower()))))
+
+
 REGLER = f"""Gör det tasken ber om. Rör inte mer än tasken säger.
 Klart steg: bocka och stryk över det: python3 {HERE}/motion-task.py bocka <task> <stegets nummer>
-Status: In Progress medan du jobbar. Waiting (blå) när ni väntar på något utanför tasken (ett svar, en leverans, tid) och ingen måste agera nu. Blocked när en människa måste agera för att du ska komma vidare. Stäng aldrig själv.
-Kommentera bara när någon måste agera: Beslut, Kolla eller Blockerad. Tre stycken med tom rad emellan: rubrik (Etikett: ämne, max 60 tecken), läget, vad personen gör. Skriv som till en barndomsvän: vardagsord, rakt på sak, avslappnat.
+Status: In Progress medan du jobbar. Waiting (blå) när ni väntar på något utanför tasken (ett svar, en leverans, tid) och ingen måste agera nu. Blocked när en människa måste agera för att du ska komma vidare.
+Jobbet klart och alla steg bockade: stäng själv och tagga den som bad om tasken: python3 {HERE}/motion-task.py stang <task> --tagga namn --text "Stängd: ämne\\n\\nLösningen i 1 mening.\\n\\nInget att göra. Säg till om något saknas, så öppnar jag igen."
+Ska någon kolla ditt jobb: skapa ingen ny task. Skriv läget överst (python3 {HERE}/motion-task.py laget <task> "vad som hänt"), byt ansvarig till den som kollar och skriv en Kolla-kommentar. Canceled sätter du aldrig själv.
+Kommentera bara när någon måste agera (Beslut, Kolla, Blockerad) eller när du stänger (Stängd). Tre stycken med tom rad emellan: rubrik (Etikett: ämne, max 60 tecken), läget, vad personen gör. Skriv som till en barndomsvän: vardagsord, rakt på sak, avslappnat.
 Tagga sist: python3 {HERE}/motion-kommentar.py --task <task> --tagga namn --text "..."
 Fråga mig om något är oklart. Avsluta med 1 rad till mig i chatten."""
 
@@ -438,6 +515,12 @@ if __name__ == "__main__":
         start(task_id(a[1]))
     elif len(a) >= 2 and a[0] == "gilla":
         gilla(task_id(a[1]), flagga(a, "--kommentar"), "--egna" in a)
+    elif a[:1] == ["stad"]:
+        stad(int(flagga(a, "--dagar") or 30), "--alla" in a)
+    elif len(a) >= 2 and a[0] == "stang" and flagga(a, "--text"):
+        stang(task_id(a[1]), flagga(a, "--tagga"), flagga(a, "--text"), "--trots-steg" in a)
+    elif len(a) >= 3 and a[0] == "laget":
+        laget(task_id(a[1]), a[2])
     elif len(a) >= 3 and a[0] == "status":
         status(task_id(a[1]), a[2], "--bekrafta" in a)
     elif len(a) >= 3 and a[0] == "hamta":

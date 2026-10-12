@@ -1,6 +1,6 @@
 ---
 name: motion-task
-description: Skapa, ändra eller sköt en task i Motion i Leveling Systems form. Titel, kort text (målrad, högst 3 steg, Sätt igång-prompt när en LLM kan hjälpa), rätt ansvarig, ping bara när någon måste agera, och länken till den som bad om tasken. Enda källan för hur en Motion-task skrivs, även bolltasks (🏐) och tasks från rutiner. Triggers "gör en task", "tasta", "lägg in i Motion", "ge Fahd en uppgift", "Motion-task", "starta tasken", "sätt status", "min Motion-inkorg", "bocka steget", "bollen".
+description: Skapa, ändra eller sköt en task i Motion i Leveling Systems form. Titel, kort text (målrad, högst 3 steg, Sätt igång-prompt när en LLM kan hjälpa), rätt ansvarig, ping bara när någon måste agera, och länken till den som bad om tasken. Enda källan för hur en Motion-task skrivs, även bolltasks (🏐) och tasks från rutiner. Triggers "gör en task", "tasta", "lägg in i Motion", "ge Fahd en uppgift", "Motion-task", "starta tasken", "sätt status", "min Motion-inkorg", "bocka steget", "bollen", "stäng tasken", "städa Motion".
 ---
 
 # Motion-task
@@ -81,7 +81,7 @@ En task är **högst ~8 rader + en Sätt igång-prompt**. Teknik bor i prompten,
 | Klart steg | `data-checked="true"` + texten i `<s>…</s>` (görs av `bocka`, del 6) |
 | Länk | `<a href="…">namn</a>` |
 
-Ordningen: målrad, (OBS!), steg, (lång lista), (Sätt igång), Berörda, (Bilagor).
+Ordningen: (Läget), målrad, (OBS!), steg, (lång lista), (Sätt igång), Berörda, (Bilagor). `Läget:` finns bara när tasken väntar på en kontroll, och skrivs med `laget` (del 2, Kolla).
 
 **Bilagor-raden.** Finns en bilaga står en rad längst ner: `<p><strong>Bilagor:</strong> <code>Filnamn.md</code> (vad den innehåller, 1 rad).</p>`. En rad per fil. Ingen bilaga, ingen rad. `kolla` ger FEL om en bilaga saknas där.
 Lång lista: egen checklista efter en `<hr>`. Grupper med en fet rad och en tom rad emellan.
@@ -120,12 +120,18 @@ Följ reglerna som start skriver ut. Fråga mig om något är oklart.</code></pr
 
 `WS_ID` = arbetsytans id, `tk_ID` = taskens id.
 
-**Kolla-task** (bollen tillbaka till den som bad): målrad = vad den andra säger är klart. Steg: **Be** Claude kolla (prompten). **Rätt:** stäng tasken. **Fel:** byt ansvarig tillbaka och skriv vad som är fel. Prompten ber Claude kolla det som sägs vara klart och svara rätt eller fel med bevis.
+**Kolla sker i samma task, aldrig i en ny.** När ditt jobb är klart och någon ska kolla det:
+1. `laget <task> "<vad som hänt>"` skriver 1 rad `Läget:` överst i texten (kort och enkelt, som till en förskoleklassare). Finns raden byts den, inget annat rörs.
+2. Byt ansvarig till den som ska kolla (`update` med bara `assigneeId`).
+3. En `Kolla:`-kommentar (del 3) till samma person.
+
+**Rätt:** den som kollar stänger (del 6). **Fel:** ny `Läget:`-rad, ansvarig tillbaka och en `Kolla:`-kommentar om vad som är fel.
 
 ## 3. Personer och ping
 
 - **Ansvarig** (assignee) = den som äger uppgiften. Alltid 1 person.
-- **Ping-regeln:** en notis i någons inkorg betyder *du ska göra något*. Tagga bara den som måste agera nu: `Beslut` (någon ska välja), `Kolla` (någon ska granska) eller `Blockerad` (du väntar på just den personen). Klart, påbörjat, läst och FYI står i tasken, inte i inkorgen.
+- **Ping-regeln:** en notis i någons inkorg betyder *du ska göra något*. Tagga bara den som måste agera nu: `Beslut` (någon ska välja), `Kolla` (någon ska granska) eller `Blockerad` (du väntar på just den personen). Påbörjat, läst och FYI står i tasken, inte i inkorgen.
+- **Undantaget `Stängd`:** när du stänger en task taggar du den som bad om tasken och ansvarig (aldrig dig själv), så de vet att den är borta ur listan och varför (del 6).
 - **Ny task:** ingen taggkommentar. Motion pingar ansvarig själv när du sätter ansvarig.
 - **Byter du ansvarig:** tagga inte den nya ägaren, Motion pingar redan.
 - **Många på en gång:** fler än 2 tasks inom 1 timme ger ingen tagg per task. Säg i chatten vad som flyttats.
@@ -154,7 +160,7 @@ Följ reglerna som start skriver ut. Fråga mig om något är oklart.</code></pr
 
 Verktyget är `mcp__motion__motion_tasks`. **Ett anrop i taget.**
 
-0. `motion_projects list` med `workspaceId` (del 0: välj projekt). Sedan `list` med `workspaceId` och ett ord ur titeln. Finns tasken redan: ändra den, skapa ingen ny.
+0. `motion_projects list` med `workspaceId` (del 0: välj projekt). **Sedan dubblettkollen:** `list` med `workspaceId` och 2 till 3 olika ord ur titeln, en sökning per ord. Osäker: `stad --alla` listar alla öppna tasks efter titel. Finns en öppen task om samma sak: ändra den, skapa ingen ny. Överlappar 2 tasks: slå ihop (den som lämnas blir Canceled med en `OBS!`-rad som pekar på den som gäller, efter ja).
 1. `create` med `name` och `workspaceId`, och `projectName` om tasken hör till ett projekt (det går inte att sätta sen). Create tar bort all HTML, och `assigneeId` i create ger INTERNAL_ERROR.
 2. `update` med `description` (HTML), `priority: MEDIUM`, `duration: 30` och `dueDate` 10 dagar fram (YYYY-MM-DD), om inget annat sägs. Skicka aldrig `autoScheduled`. Prompten får taskens eget id, som finns först efter `create`.
 3. `update` med bara `assigneeId`.
@@ -185,6 +191,9 @@ Skriptet `python3 ~/.claude/skills/motion-task/scripts/motion-task.py` gör det 
 - `kolla <länk>`: mäter tasken mot reglerna (del 4 steg 5), utgångskod 1 vid fel.
 - `bocka <länk> <nr|text> [...]`: bockar steget och stryker över texten, rör inget annat. Nummer räknas från 1 uppifrån. `las` visar varje steg som `[x]` eller `[ ]`. **Bocka varje steg när det är klart**, så syns det svart på vitt vad som är gjort. En bock syns inte live hos någon som har tasken öppen: ladda om sidan.
 - `status <länk> <namn>`: byter status. I Leveling Systems: Backlog, Blocked, Canceled, Completed, In Progress, Todo och **Waiting** (blå).
+- `stang <länk> --tagga namn --text "Stängd: …"`: sätter **Completed** och skickar en `Stängd:`-kommentar. Nekar om något steg inte är bockat. Klart men ett steg blev onödigt: `--trots-steg`, och skriv varför i kommentaren.
+- `laget <länk> "<vad som hänt>"`: skriver eller byter raden `Läget:` överst i texten.
+- `stad [--dagar 30] [--alla]`: listar öppna tasks som är **klara men öppna** (alla steg bockade) och **orörda i 30+ dagar**. `--alla` listar alla öppna efter titel, så att dubbletter hamnar bredvid varandra.
 - `steg <länk> <projekt-id> [steg]`: lägger tasken i projektets steg (utan steg: listar stegen).
 - `inkorg [--olasta] [--typ x] [--antal 30]`: din egen Motion-inkorg (andras går inte att läsa). Typer: `mentioned-in-task-comment`, `task-assigned`, `task-status-updated`, `project-stage-entered`, `mentioned-in-note`.
 - `moten [--sok text] [--antal 5] [--full]`: AI Notetakerns sammanfattning, deltagare och åtgärdspunkter. **Konfidentiella möten** (ägarstruktur, skatt, löner, personfrågor) blir aldrig tasks, eftersom hela teamet ser tasks.
@@ -193,7 +202,24 @@ Skriptet `python3 ~/.claude/skills/motion-task/scripts/motion-task.py` gör det 
 
 **Kalenderblock** (`isFixedTimeTask`, till exempel tasks som GHL skapar från en bokning) går inte att stänga via API (testat med 5 vägar). Be personen trycka Mark complete i Motion. Skriptet säger det när det händer.
 
-**Var dynamisk med status.** **In Progress** när du jobbar. **Waiting** (blå) när ni väntar på något utanför tasken (ett svar, en leverans, tid) och ingen måste agera nu. **Blocked** när en människa måste agera för att du ska komma vidare, med en `Blockerad:`-kommentar till just den personen. **Backlog** om det ska vänta. Tillbaka till In Progress när det går igen. **Completed och Canceled bara när personen sagt det** (skriptet kräver `--bekrafta`). Kommentera bara när någon måste agera (del 3).
+**Var dynamisk med status.** **In Progress** när du jobbar. **Waiting** (blå) när ni väntar på något utanför tasken (ett svar, en leverans, tid) och ingen måste agera nu. **Blocked** när en människa måste agera för att du ska komma vidare, med en `Blockerad:`-kommentar till just den personen. **Backlog** om det ska vänta. Tillbaka till In Progress när det går igen. Kommentera bara när någon måste agera (del 3).
+
+**Stäng så att inget staplas upp.** En task som är klar ska bort ur listan direkt.
+- **Jobbet klart** (målet nått, alla steg bockade, beviset kollat): stäng själv med `stang`. Säg det i chatten i 1 rad med länken.
+- **Stängd-kommentaren** följer mallen i del 3, taggen sist:
+
+  ```
+  Stängd: Fritext i alla formulär
+
+  Alla 23 formulär har nu en fritextruta, testat live i 3.
+
+  Inget att göra. Säg till om något saknas, så öppnar jag igen. @Namn
+  ```
+
+  Mittstycket är lösningen, eller varför tasken stängs om den inte behövs längre.
+- **Orörd i 30+ dagar:** stäng inte. Lista dem (`stad`) och låt den som äger tasken klicka vilka som blir Canceled.
+- **Canceled sätter du bara efter personens ja** (`status <länk> Canceled --bekrafta`). Skriv varför i en `Stängd:`-kommentar.
+- **När du letar:** när jobbet blir klart, före varje ny task (del 4 steg 0) och i rutinen Start motion (`stad`).
 
 ## 7. Din egen Motion-nyckel
 
