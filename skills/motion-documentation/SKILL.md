@@ -9,7 +9,7 @@ Tasken, titeln, texten, bilagor, status och ping följer skillen `motion-task`. 
 
 ## 1. Före
 
-- **Sök först** efter en öppen task om samma bygge (`motion-task` del 4, steg 0) och använd den. Finns ingen: skapa en.
+- **Sök först** efter en öppen task om samma bygge (`motion-task` del 4, steg 0) och använd den. Finns ingen: skapa en. Är den **Completed**: sätt In Progress och skriv `Återöppnad <datum>: var Completed <datum>, <varför>.` (`motion-task` del 6), skapa ingen ny.
 - **Testat först.** Bygget ska ha körda kontroller med utdata (en testtabell, `rule-check` med 0 FAIL, eller ett kommando med svar). Saknas de: kör dem. Dokumentera aldrig ett bygge som inte testats.
 - **Finns allt prompten pekar på?** Kolla verktyg, nycklar och filer före bygget. Saknas något: säg det i 1 rad och fråga Alex. (Lärdom 17 okt: prompten sa "Jev", som inte fanns.)
 
@@ -30,7 +30,8 @@ Skriv filen i en tillfällig mapp, inte i en projektmapp. Hör den till ett skri
 ## 3. Bifoga och stäng
 
 - `python3 ~/.claude/skills/motion-task/scripts/motion-task.py bifoga <task> <fil> --flytta`
-- Finns en äldre dokumentation: `dopa` den till `GAMMAL <namn>` först.
+- Finns en äldre dokumentation: `dopa` den till `GAMMAL <namn>` först. Finns redan en `GAMMAL`: numrera (`GAMMAL 2 <namn>`, `GAMMAL 3 …`), annars blir två filer lika.
+- Motion tar inte `.py` (400 Unsupported file type). Bifoga skript som `<namn>.py.txt` och skriv i `Läget:` att den ska döpas om. `.md`, `.zip` och `.gif` går.
 - Lägg en `Bilagor:`-rad i tasken, en rad per fil.
 - Bocka stegen, kör `kolla`, stäng med `stang` när målet är nått.
 
@@ -41,7 +42,7 @@ Först när testerna gått igenom (visa utdata). Fråga Alex klickbart, en fråg
 Ja:
 
 1. Hämta personens Motion-id med `motion_users list`. Hårdkoda inga id.
-2. Skapa en boll-task (`motion-task`, bollreglerna i titeldelen): `<Område>: 🏐 <vad> (<d mån>)`, ansvarig personen. Skriv den som till en förskoleklassare: mål i 1 mening, varför du, högst 5 steg med **Klart när**, regler en per rad, **Rör inte**, tekniken sist under **För din Claude**. Dokumentationen som bilaga.
+2. Skapa en vanlig task **utan boll** (Alex 17 okt: ingen 🏐 vid delning), titel enligt `motion-task` med emoji efter vad personen ska göra (till exempel ✨ Prova …), ansvarig personen. Boll bara om Alex ber om den. Skriv den som till en förskoleklassare: mål i 1 mening, varför du, högst 5 steg med **Klart när**, regler en per rad, **Rör inte**, tekniken sist under **För din Claude**. Dokumentationen som bilaga. Delas ett skript: ingen nyckel i filen, mottagaren skapar sin egen.
 3. Fahd: mjukt datum, ungefär 10 dagar fram. Fråga aldrig om datum eller tid. Hans kod (live-sajten, appen) ligger i hans repo: skicka PR, pusha aldrig till main. Kolla andra sessioner före bygge i ett delat repo.
 4. Ny task: Motion pingar själv, ingen extra kommentar.
 5. Säg efteråt i 1 rad vad som delades, med länken.
