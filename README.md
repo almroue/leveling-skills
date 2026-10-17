@@ -16,6 +16,7 @@ npx skills add almroue/leveling-skills -g
 |---|---|
 | `logga` | Loggar en klar leverans (video, bild, artefakt, kod) i den delade artefakten Leveranslogg. Alla i teamet ser senaste ändringarna på ett ställe. |
 | `motion-task` | Skapar och sköter tasks i Motion i vår form: kort titel, högst 3 steg, Sätt igång-prompt, rätt ping. Kommer med två skript. Du behöver din egen Motion-nyckel (se skillen, del 7). |
+| `motion-documentation` | Skriver dokumentationen för ett färdigt bygge, bifogar den i Motion och frågar om den ska delas med teamet efter lyckade tester. Bygger på `motion-task`. |
 
 ## Så jobbar vi med loggen
 
